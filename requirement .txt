@@ -1,0 +1,20 @@
+version 0.0
+20180818
+
+
+### train
+- input
+	- get script from twitter # 
+	- select english          # success
+- how
+	- generate script using GAN
+	- to learn reply using retweet
+	- to learn good reply using like
+
+### interface
+- class object
+	- train
+	- 
+
+twitter
+- save
