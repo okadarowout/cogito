@@ -1,4 +1,5 @@
-import json, config
+import json
+from cogito.utils import config
 from requests_oauthlib import OAuth1Session
 import datetime, time
 
