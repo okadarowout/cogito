@@ -97,39 +97,27 @@ class base_optimizer(metaclass=ABCMeta):
         pass
     
     @abstactmethod
-    def get
+    def train(self):
+        pass
 
 class simple_bp(base_optimizer):
     """docstring for simple_optimizer"""
     def __init__(self, source):
-        super(simple_optimizer, self).__init__(source)
+        super(simple_bp, self).__init__(source)
 
     def configure(self, network):
         X0 = tf.matmul(network.input, network.Wih)
         X1 = tf.tanh(tf.nn.batch_normalization(X0)
         output = tf.nn.softmax(tf.matmul(X1, network.Who))
-        self.loss = tf.losses.softmax_cross_entropy(network.output, output)
+        self._loss = tf.losses.softmax_cross_entropy(network.output, output)
 
-
-
-
-class basecogito(metaclass=ABCMeta):
-    """docstring for basecogito"""
-    def __init__(self, arg):
-        super(basecogito, self).__init__()
-        self.arg = arg
-
-    @abstractmethod
-    def add_node(self):
+    def train(self):
         pass
 
-    @abstractmethod
-    def delite_node(self):
-        pass
 
-    @abstractmethod
-    def add_ops(self):
-        pass
+class hi:
+    pass
+
 
 class cogito(object):
     """docstring for cogito"""
