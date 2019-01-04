@@ -1,62 +1,78 @@
-import Qtrac
+import collections
 import tensorflow as tf
-from abc import ABCMeta, abstractmethod
+from operator import mul
+from functools import reduce
+from abc import abstractmethod, ABCMeta
 
-class network_factory(metaclass=ABCMeta):
-    """docstring for network"""
+
+
+
+
+
+class base_network(metaclass=ABCMeta):
     def __init__(self):
-        pass
+        self._input_size = None
+        self._hidden_size = None
+        self._output_size = None
 
-    def create_network():
+    @property
+    def input_size(self):
+        return self._input_size
+
+    @property
+    def output_size(self):
+        return self._output_size
+
+    @abstractmethod
+    def variables(self): pass
+
+    @abstractmethod
+    def placeholders(self): pass
+
+    @abstractmethod
+    def configure(self): pass
 
 
 
-
-nwo = network(input_size, output_size, hidden_size)
-nwo.
-
-
-
-@Qtrac.has_methods('variables', 'placeholders', 'confiture')
-class base_network(metaclass=abc.ABCMeta): pass
-
-@Qtrac.has_methods('configure', 'train')
-class base_optimizer(metaclass=abc.ABCMeta): pass   
-
-@Qtrac.has_methods('shape', 'draw')
-class base_source(metaclass=abc.ABCMeta): pass   
-
-
-    
 class simple_network(base_network):
     def __init__(self, input_size, hidden_size, output_size):
         self._input_size = input_size
         self._hidden_size = hidden_size
         self._output_size = output_size
-        super(simple_network, self).__init__()
+        self.configure()
 
     @property
     def variables(self):
         variables = [self.Wih, self.Wio, self.Whi,
             self.Whh, self.Who, self.Woi, self.Woh]
         return variables
-    
+
     @property
     def placeholders(self):
         return [self.input, self.hidden, self.output]
 
     def confiture(self):
-        self.input = tf.placeholder(tf.float32, [self._input_size], name='input')
-        self.hidden = tf.placeholder(tf.float32, [self._hidden_size], name='hidden')
-        self.output = tf.placeholder(tf.float32, [self._output_size], name='output')
+        self.input = tf.placeholder(tf.float32, [self._input_size],
+                                    name='input')
+        self.hidden = tf.placeholder(tf.float32, [self._hidden_size],
+                                     name='hidden')
+        self.output = tf.placeholder(tf.float32, [self._output_size],
+                                     name='output')
 
-        self.Wih = tf.Variable([self._hidden_size, self._input_size], name='Wih')
-        self.Wio = tf.Variable([self._output_size, self._input_size], name='Wio')
-        self.Whi = tf.Variable([self._input_size, self._hidden_size], name='Whi')
-        self.Whh = tf.Variable([self._hidden_size, self._hidden_size], name='Whh')
-        self.Who = tf.Variable([self._output_size, self._hidden_size], name='Who')
-        self.Woi = tf.Variable([self._input_size, self._output_size], name='Woi')
-        self.Woh = tf.Variable([self._hidden_size, self._output_size], name='Woh')
+        self.Wih = tf.Variable([self._hidden_size, self._input_size],
+                               name='Wih')
+        self.Wio = tf.Variable([self._output_size, self._input_size],
+                               name='Wio')
+        self.Whi = tf.Variable([self._input_size, self._hidden_size],
+                               name='Whi')
+        self.Whh = tf.Variable([self._hidden_size, self._hidden_size],
+                               name='Whh')
+        self.Who = tf.Variable([self._output_size, self._hidden_size],
+                               name='Who')
+        self.Woi = tf.Variable([self._input_size, self._output_size],
+                               name='Woi')
+        self.Woh = tf.Variable([self._hidden_size, self._output_size],
+                               name='Woh')
 
     def save(self):
         pass
@@ -75,7 +91,12 @@ class optimizer_book:
     def names(self):
         return list(map(lambda obj:obj._name, self._opt_list))
 
+class base_optimizer(metaclass=ABCMeta):
+    @abstractmethod
+    def configure(self): pass
 
+    @abstractmethod
+    def train(self): pass
 
 class simple_bp(base_optimizer):
     """docstring for simple_optimizer"""
@@ -83,6 +104,7 @@ class simple_bp(base_optimizer):
         self._source = source
 
     def configure(self, network):
+        raise self._source.shape == network.input_size
         X0 = tf.matmul(network.input, network.Wih)
         X1 = tf.tanh(tf.nn.batch_normalization(X0))
         output = tf.nn.softmax(tf.matmul(X1, network.Who))
@@ -105,34 +127,67 @@ class cogito(object):
         self._network.confiture()
 
     def set_optimizer(self, optimizer, source):
-        if not isinstance(renderer, base_optimizer):
+        if not isinstance(optimizer, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
-                    format(type(renderer).__name__))
+                    format(type(optimizer).__name__))
         optimizer(source())
 
-@Qtrac.has_methods('shape', '__next__')
-class base_source(metaclass=abc.ABCMeta): pass   
+class base_source(metaclass=ABCMeta):
+
+    def __iter__(self):
+        return self
+
+    @abstractmethod
+    def shape(self): pass
+
+    @abstractmethod
+    def __next__(self): pass
+
+
+
 
 class mnist(base_source):
-    def __init__(self):
+    def __init__(self, train=True, melt=False):
+        self._train = train
+        self._melt = melt
+
         krs_mnist = tf.keras.datasets.mnist
         (x_train, y_train), (x_test, y_test) = krs_mnist.load_data()
         self._x_train = x_train
         self._y_train = y_train
         self._x_test = x_test
         self._y_test = y_test
-        self.len = x_train.shape[0]
-        
-        pass
+
+        self.reset_source()
+
+    def __next__(self):
+        x = self._x_train[self._cnt]
+        y = self._y_train[self._cnt]
+        if self._melt:
+            x = x.reshape(self.shape)
+        self._update_cnt()
+        return x, y
+
+    def _update_cnt(self):
+        self._cnt = self._cnt + 1
+        if self._cnt == self._len:
+            self._cnt = 0
+
+    def reset_source(self, train=True):
+        if self._train:
+            self._len = self._x_train.shape[0]
+        else:
+            self._len = self._x_test.shape[0]
+        self._cnt = 0
 
     @property
     def shape(self):
-        pass
+        shape = self._x_train.shape[1:]
+        if self._melt:
+            shape = (reduce(mul, shape))
+        return shape
 
-    def __next__(self):
-        return self
-
-data = mnist.load_data()
+def test
 
 def main():
     network_size = {'input_size': 28 * 28, 
@@ -140,8 +195,8 @@ def main():
                  'output_size': 10}
     cgt = cogito()
     cgt.set_networks(simple_network(**network_size))
-    cgt.set_optimizer(simple_bp(mnist()))
-    cgt.set_optimizer(simple_ae(mnist()))
+    cgt.set_optimizer(simple_bp(mnist(melt=True)))
+    cgt.set_optimizer(simple_ae(mnist(melt=True)))
     cgt.train(epoch=10, chains=cgt.optimizers)
     
 

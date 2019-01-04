@@ -18,3 +18,8 @@ version 0.0
 
 twitter
 - save
+
+Roadmap
+1 to execute main function in cogito.py
+2 make test function in cogito.py
+3 configure directory structure again
