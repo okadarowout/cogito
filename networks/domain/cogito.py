@@ -78,30 +78,26 @@ class simple_network(base_network):
         pass
 
 
-class optimizer_book:
-    def __init__(self):
-        self._opt_list = []
-
-    def register(self, optimizer, network):
-        opt = optimizer(network)
-        self._opt_list.append(opt)
-        return opt
-
-    @property
-    def names(self):
-        return list(map(lambda obj:obj._name, self._opt_list))
 
 class base_optimizer(metaclass=ABCMeta):
+    def __init__(self, name='base_optimizer'):
+        self._name = name
+
     @abstractmethod
     def configure(self): pass
 
     @abstractmethod
     def train(self): pass
 
+    @property
+    def name(self):
+        return self._name
+
 class simple_bp(base_optimizer):
     """docstring for simple_optimizer"""
-    def __init__(self, source):
+    def __init__(self, source, name='simple_bp'):
         self._source = source
+        self._name = name
 
     def configure(self, network):
         raise self._source.shape == network.input_size
@@ -114,6 +110,20 @@ class simple_bp(base_optimizer):
         return self
 
 
+class optimizer_book:
+    def __init__(self):
+        self._opt_list = []
+
+    def register(self, optimizer, network):
+        assert optimizer.name not in self.names
+        opt = optimizer(network)
+        self._opt_list.append(opt)
+        setattr(self, optimizer.name, opt)
+        return opt
+
+    @property
+    def names(self):
+        return list(map(lambda obj:obj._name, self._opt_list))
 
 
 class cogito(object):
@@ -121,6 +131,7 @@ class cogito(object):
     def __init__(self, arg):
         super(cogito, self).__init__()
         self.arg = arg
+        self._book = optimizer_book()
         
     def set_networks(self, network):
         self._network = network()
@@ -130,18 +141,28 @@ class cogito(object):
         if not isinstance(optimizer, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
                     format(type(optimizer).__name__))
-        optimizer(source())
+        self._book.register(optimizer(source()), self.network)
 
+    def train(self, iterate_number=100, chains=cgt.optimizers):
+
+
+
+    @property
+    def optimizers(self):
+        return self._book.names
+
+
+########## source
 class base_source(metaclass=ABCMeta):
 
     def __iter__(self):
         return self
 
     @abstractmethod
-    def shape(self): pass
+    def __next__(self): pass
 
     @abstractmethod
-    def __next__(self): pass
+    def shape(self): pass
 
 
 
