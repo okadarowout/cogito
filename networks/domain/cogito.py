@@ -82,12 +82,16 @@ class simple_network(base_network):
 class base_optimizer(metaclass=ABCMeta):
     def __init__(self, name='base_optimizer'):
         self._name = name
+        self.predictable = False
 
     @abstractmethod
     def configure(self): pass
 
     @abstractmethod
     def train(self): pass
+
+    @abstractmethod
+    def predict(self): pass
 
     @property
     def name(self):
@@ -106,8 +110,11 @@ class simple_bp(base_optimizer):
         output = tf.nn.softmax(tf.matmul(X1, network.Who))
         self._loss = tf.losses.softmax_cross_entropy(network.output, output)
 
-    def train(self):
-        return self
+    def train(self, sess):
+        sess.run(self._opt)
+
+    def predict(self. sess)
+        sess.run(self.output)
 
 
 class optimizer_book:
@@ -115,15 +122,19 @@ class optimizer_book:
         self._opt_list = []
 
     def register(self, optimizer, network):
-        assert optimizer.name not in self.names
+        assert optimizer.name not in dir(self)
         opt = optimizer(network)
         self._opt_list.append(opt)
         setattr(self, optimizer.name, opt)
-        return opt
 
     @property
     def names(self):
         return list(map(lambda obj:obj._name, self._opt_list))
+
+    @property
+    def predictable(self):
+        priter = filter(lambda obj: obj.predictable, self._optself._opt_list)
+        return list(map(lambda obj:obj._name, priter))
 
 
 class cogito(object):
@@ -132,7 +143,7 @@ class cogito(object):
         super(cogito, self).__init__()
         self.arg = arg
         self._book = optimizer_book()
-        
+
     def set_networks(self, network):
         self._network = network()
         self._network.confiture()
@@ -143,7 +154,16 @@ class cogito(object):
                     format(type(optimizer).__name__))
         self._book.register(optimizer(source()), self.network)
 
-    def train(self, iterate_number=100, chains=cgt.optimizers):
+    def train(self, iterate_number=10000, chains=self.optimizers):
+        with tf.sesson as sess:
+            self._network.init()
+            for i in range(iterate_number):
+                for optname in chains:
+                    opt = getattr(self._book, optname)
+                    sess.run(opt)
+            self._network.save()
+
+    def predict(self)
 
 
 
@@ -218,8 +238,8 @@ def main():
     cgt.set_networks(simple_network(**network_size))
     cgt.set_optimizer(simple_bp(mnist(melt=True)))
     cgt.set_optimizer(simple_ae(mnist(melt=True)))
-    cgt.train(epoch=10, chains=cgt.optimizers)
-    
+    cgt.train(iterate_number=10, chains=cgt.optimizers)
+    cgt.predict(iterate_number=chains, chains=cgt.predictable)
 
 if __name__ == '__main__':
     main()
