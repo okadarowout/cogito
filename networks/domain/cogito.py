@@ -52,27 +52,17 @@ class simple_network(base_network):
         return [self.input, self.hidden, self.output]
 
     def confiture(self):
-        self.input = tf.placeholder(tf.float32, [self._input_size],
-                                    name='input')
-        self.hidden = tf.placeholder(tf.float32, [self._hidden_size],
-                                     name='hidden')
-        self.output = tf.placeholder(tf.float32, [self._output_size],
-                                     name='output')
+        self.input = tf.placeholder(tf.float32, [self._input_size], name='input')
+        self.hidden = tf.placeholder(tf.float32, [self._hidden_size], name='hidden')
+        self.output = tf.placeholder(tf.float32, [self._output_size], name='output')
 
-        self.Wih = tf.Variable([self._hidden_size, self._input_size],
-                               name='Wih')
-        self.Wio = tf.Variable([self._output_size, self._input_size],
-                               name='Wio')
-        self.Whi = tf.Variable([self._input_size, self._hidden_size],
-                               name='Whi')
-        self.Whh = tf.Variable([self._hidden_size, self._hidden_size],
-                               name='Whh')
-        self.Who = tf.Variable([self._output_size, self._hidden_size],
-                               name='Who')
-        self.Woi = tf.Variable([self._input_size, self._output_size],
-                               name='Woi')
-        self.Woh = tf.Variable([self._hidden_size, self._output_size],
-                               name='Woh')
+        self.Wih = tf.Variable([self._hidden_size, self._input_size], name='Wih')
+        self.Wio = tf.Variable([self._output_size, self._input_size], name='Wio')
+        self.Whi = tf.Variable([self._input_size, self._hidden_size], name='Whi')
+        self.Whh = tf.Variable([self._hidden_size, self._hidden_size], name='Whh')
+        self.Who = tf.Variable([self._output_size, self._hidden_size], name='Who')
+        self.Woi = tf.Variable([self._input_size, self._output_size], name='Woi')
+        self.Woh = tf.Variable([self._hidden_size, self._output_size], name='Woh')
 
     def save(self):
         pass
@@ -83,9 +73,10 @@ class base_optimizer(metaclass=ABCMeta):
     def __init__(self, name='base_optimizer'):
         self._name = name
         self.predictable = False
+        self._variables = []
 
     @abstractmethod
-    def configure(self): pass
+    def configure(self):
 
     @abstractmethod
     def train(self): pass
@@ -93,28 +84,48 @@ class base_optimizer(metaclass=ABCMeta):
     @abstractmethod
     def predict(self): pass
 
+
     @property
     def name(self):
         return self._name
+
+    @property
+    def variables(self):
+        return self._variables
+
+    def init(self, sess):
+        for v in self._variables:
+            sess.run(tf.variables_initializer(v))
+
 
 class simple_bp(base_optimizer):
     """docstring for simple_optimizer"""
     def __init__(self, source, name='simple_bp'):
         self._source = source
         self._name = name
+        self._variables = []
 
     def configure(self, network):
         raise self._source.shape == network.input_size
-        X0 = tf.matmul(network.input, network.Wih)
+        self._input = network.input
+        self._output = network.output
+        X0 = tf.matmul(self._input, network.Wih)
         X1 = tf.tanh(tf.nn.batch_normalization(X0))
-        output = tf.nn.softmax(tf.matmul(X1, network.Who))
-        self._loss = tf.losses.softmax_cross_entropy(network.output, output)
+        self.output = tf.nn.softmax(tf.matmul(X1, network.Who))
+        self._loss = tf.losses.softmax_cross_entropy(self._output, self.output)
+        self._opt = tf.train.AdamOptimizer()
+        self._variables = self._variables + self._opt.variables()
 
     def train(self, sess):
-        sess.run(self._opt)
+        input_data, output_data = self._source.__next__()
+        sess.run(self._opt.minimize(self._loss),
+            feed_dict={self._input: input_data, self._output: output_data})
 
-    def predict(self. sess)
-        sess.run(self.output)
+    def predict(self. sess, test_source=False):
+        if test_source and self._source.train:
+            self._source.reset_source(train=False)
+        input_data, output_data = self._source.__next__()
+        sess.run(self.output, feed_dict={self._input: input_data})
 
 
 class optimizer_book:
@@ -123,7 +134,7 @@ class optimizer_book:
 
     def register(self, optimizer, network):
         assert optimizer.name not in dir(self)
-        opt = optimizer(network)
+        opt = optimizer.configure(network)
         self._opt_list.append(opt)
         setattr(self, optimizer.name, opt)
 
@@ -135,6 +146,10 @@ class optimizer_book:
     def predictable(self):
         priter = filter(lambda obj: obj.predictable, self._optself._opt_list)
         return list(map(lambda obj:obj._name, priter))
+
+    def extract_from_name_list(self, name_list):
+        for optname in name_list:
+            yield getattr(self, optname)
 
 
 class cogito(object):
@@ -156,12 +171,19 @@ class cogito(object):
 
     def train(self, iterate_number=10000, chains=self.optimizers):
         with tf.sesson as sess:
-            self._network.init()
+            # initialize
+            self._network.init(sess)
+            for opt in self._book.extract_from_name_list(chains):
+                opt.init(sess)
+
+            # train
             for i in range(iterate_number):
-                for optname in chains:
-                    opt = getattr(self._book, optname)
-                    sess.run(opt)
-            self._network.save()
+                for opt in self._book.extract_from_name_list(chains):
+                    opt.train(sess)
+            
+            # save
+            self._network.save(sess)
+
 
     def predict(self)
 
@@ -174,7 +196,6 @@ class cogito(object):
 
 ########## source
 class base_source(metaclass=ABCMeta):
-
     def __iter__(self):
         return self
 
