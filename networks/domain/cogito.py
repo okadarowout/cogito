@@ -1,3 +1,4 @@
+import pathlib
 import collections
 import tensorflow as tf
 from operator import mul
@@ -12,7 +13,6 @@ from abc import abstractmethod, ABCMeta
 class base_network(metaclass=ABCMeta):
     def __init__(self):
         self._input_size = None
-        self._hidden_size = None
         self._output_size = None
 
     @property
@@ -32,9 +32,14 @@ class base_network(metaclass=ABCMeta):
     @abstractmethod
     def configure(self): pass
 
+    def save(self): pass
+
 
 
 class simple_network(base_network):
+    '''
+    This network is made from 3 layer, input, hidden, output
+    '''
     def __init__(self, input_size, hidden_size, output_size):
         self._input_size = input_size
         self._hidden_size = hidden_size
@@ -76,7 +81,7 @@ class base_optimizer(metaclass=ABCMeta):
         self._variables = []
 
     @abstractmethod
-    def configure(self):
+    def configure(self, network): pass
 
     @abstractmethod
     def train(self): pass
@@ -96,6 +101,9 @@ class base_optimizer(metaclass=ABCMeta):
     def init(self, sess):
         for v in self._variables:
             sess.run(tf.variables_initializer(v))
+
+    def save(self, sess):
+        pass
 
 
 class simple_bp(base_optimizer):
@@ -150,14 +158,21 @@ class optimizer_book:
     def extract_from_name_list(self, name_list):
         for optname in name_list:
             yield getattr(self, optname)
-
-
+'''
+<https://stackoverflow.com/questions/43068472/how-to-save-a-specific-variable-in-tensorflow>
+'''
 class cogito(object):
-    """docstring for cogito"""
-    def __init__(self, arg):
-        super(cogito, self).__init__()
-        self.arg = arg
+    """
+    cogito is multi task training object
+    cogito has one network and one or more optimizer
+    """
+    def __init__(self, save_path=None, save_name='cgt.ckpk'):
+        if save_path is None:
+            self._path = pathlib.Path.cwd() / save_name
+        else:
+            self._path = pathlib.Path(save_path) / save_name
         self._book = optimizer_book()
+        self._saver = tf.train.Saver()
 
     def set_networks(self, network):
         self._network = network()
@@ -172,9 +187,11 @@ class cogito(object):
     def train(self, iterate_number=10000, chains=self.optimizers):
         with tf.sesson as sess:
             # initialize
-            self._network.init(sess)
-            for opt in self._book.extract_from_name_list(chains):
-                opt.init(sess)
+            if self._path.exists():
+                self._saver.restore(sess, self._path)
+            else:
+                self._network.init(sess)
+                map(lambda opt: opt.init(sess), self._book.extract_from_name_list(chains))
 
             # train
             for i in range(iterate_number):
