@@ -14,6 +14,7 @@ class base_network(metaclass=ABCMeta):
     def __init__(self):
         self._input_size = None
         self._output_size = None
+        self._variables = []
 
     @property
     def input_size(self):
@@ -23,8 +24,13 @@ class base_network(metaclass=ABCMeta):
     def output_size(self):
         return self._output_size
 
-    @abstractmethod
-    def variables(self): pass
+    @property
+    def variables(self): 
+        return self._variables
+
+    def init(self, sess):
+        for v in self._variables:
+            sess.run(tf.variables_initializer(v))
 
     @abstractmethod
     def placeholders(self): pass
@@ -32,7 +38,6 @@ class base_network(metaclass=ABCMeta):
     @abstractmethod
     def configure(self): pass
 
-    def save(self): pass
 
 
 
@@ -47,7 +52,7 @@ class simple_network(base_network):
         self.configure()
 
     @property
-    def variables(self):
+    def _variables(self):
         variables = [self.Wih, self.Wio, self.Whi,
             self.Whh, self.Who, self.Woi, self.Woh]
         return variables
@@ -71,7 +76,6 @@ class simple_network(base_network):
 
     def save(self):
         pass
-
 
 
 class base_optimizer(metaclass=ABCMeta):
@@ -135,14 +139,41 @@ class simple_bp(base_optimizer):
         input_data, output_data = self._source.__next__()
         sess.run(self.output, feed_dict={self._input: input_data})
 
+class network_book:
+    def __init__(self):
+        self._network = None
+        self._initialized = False
+
+    def register(self, network):
+        self._network = network()
+        self._network.confiture()
+        self._initialized = False
+        self.
+        for v in self._network.variables:
+            self.set_variables(v)
+
+    def extract_(self):
+        for v in self._network.variables:
+            yield v
+
+    def reset_initialized_status(self):
+        self._initialized = True
+
+    @property
+    def initialized(self):
+        return self._initialized
+
 
 class optimizer_book:
     def __init__(self):
         self._opt_list = []
+        self._new_opt_list = []
+
 
     def register(self, optimizer, network):
         assert optimizer.name not in dir(self)
         opt = optimizer.configure(network)
+        self._new_opt_list.append(opt)
         self._opt_list.append(opt)
         setattr(self, optimizer.name, opt)
 
@@ -152,12 +183,15 @@ class optimizer_book:
 
     @property
     def predictable(self):
-        priter = filter(lambda obj: obj.predictable, self._optself._opt_list)
-        return list(map(lambda obj:obj._name, priter))
+        predictable_iter = filter(lambda obj: obj.predictable, self._optself._opt_list)
+        return list(map(lambda obj:obj._name, predictable_iter))
 
     def extract_from_name_list(self, name_list):
         for optname in name_list:
             yield getattr(self, optname)
+
+    def reset_new_opt(self):
+        self._new_opt_list = []
 '''
 <https://stackoverflow.com/questions/43068472/how-to-save-a-specific-variable-in-tensorflow>
 '''
@@ -168,47 +202,53 @@ class cogito(object):
     """
     def __init__(self, save_path=None, save_name='cgt.ckpk'):
         if save_path is None:
-            self._path = pathlib.Path.cwd() / save_name
+            self._save_path = pathlib.Path.cwd() / save_name
         else:
-            self._path = pathlib.Path(save_path) / save_name
-        self._book = optimizer_book()
-        self._saver = tf.train.Saver()
+            self._save_path = pathlib.Path(save_path) / save_name
+        self._opt_book = optimizer_book()
+        self._net_book = network_book()
 
     def set_networks(self, network):
-        self._network = network()
-        self._network.confiture()
+        self._net_book.register(network)
 
     def set_optimizer(self, optimizer, source):
         if not isinstance(optimizer, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
                     format(type(optimizer).__name__))
-        self._book.register(optimizer(source()), self.network)
+        self._opt_book.register(optimizer(source()), self.network)
 
     def train(self, iterate_number=10000, chains=self.optimizers):
         with tf.sesson as sess:
             # initialize
             if self._path.exists():
                 self._saver.restore(sess, self._path)
+
+            map(lambda v:sess.run(tf.variables_initializer(v)), self._used_variables)
             else:
                 self._network.init(sess)
-                map(lambda opt: opt.init(sess), self._book.extract_from_name_list(chains))
+                map(lambda opt: opt.init(sess), self._opt_book.extract_from_name_list(chains))
 
             # train
             for i in range(iterate_number):
-                for opt in self._book.extract_from_name_list(chains):
+                for opt in self._opt_book.extract_from_name_list(chains):
                     opt.train(sess)
             
             # save
-            self._network.save(sess)
+            self._saver = tf.train.Saver()
+            self._saver.save(sess, self._save_path)
 
 
-    def predict(self)
+    def predict(self):
+        pass
 
 
 
     @property
     def optimizers(self):
         return self._book.names
+
+    def set_variables(variable):
+        self._new_variables.append(variable)
 
 
 ########## source
