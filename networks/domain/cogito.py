@@ -25,7 +25,7 @@ class base_network(metaclass=ABCMeta):
         return self._output_size
 
     @property
-    def variables(self): 
+    def variables(self):
         return self._variables
 
     def init(self, sess):
@@ -148,11 +148,10 @@ class network_book:
         self._network = network()
         self._network.confiture()
         self._initialized = False
-        self.
         for v in self._network.variables:
             self.set_variables(v)
 
-    def extract_(self):
+    def extract_variables(self):
         for v in self._network.variables:
             yield v
 
@@ -216,6 +215,9 @@ class cogito(object):
             raise TypeError("Expected object of type base_optimizer, got {}".
                     format(type(optimizer).__name__))
         self._opt_book.register(optimizer(source()), self.network)
+
+    def extract_new_variables(self):
+        yield from self._opt_book.
 
     def train(self, iterate_number=10000, chains=self.optimizers):
         with tf.sesson as sess:
