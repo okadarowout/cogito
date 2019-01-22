@@ -139,7 +139,7 @@ class simple_bp(base_optimizer):
         input_data, output_data = self._source.__next__()
         sess.run(self.output, feed_dict={self._input: input_data})
 
-class network_book:
+class network_catalog:
     def __init__(self):
         self._network = None
         self._initialized = False
@@ -162,8 +162,10 @@ class network_book:
     def initialized(self):
         return self._initialized
 
+    def 
 
-class optimizer_book:
+
+class optimizer_catalog:
     def __init__(self):
         self._opt_list = []
         self._new_opt_list = []
@@ -204,20 +206,23 @@ class cogito(object):
             self._save_path = pathlib.Path.cwd() / save_name
         else:
             self._save_path = pathlib.Path(save_path) / save_name
-        self._opt_book = optimizer_book()
-        self._net_book = network_book()
+        self._opt_catalog = optimizer_catalog()
+        self._net_catalog = network_catalog()
+        self._saver = None
 
     def set_networks(self, network):
-        self._net_book.register(network)
+        self._net_catalog.register(network)
 
     def set_optimizer(self, optimizer, source):
         if not isinstance(optimizer, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
                     format(type(optimizer).__name__))
-        self._opt_book.register(optimizer(source()), self.network)
+        self._opt_catalog.register(optimizer(source()), self.network)
 
-    def extract_new_variables(self):
-        yield from self._opt_book.
+    def _extract_variables(new=False):
+        yield from self._net_catalog.extract_variables(new=new)
+        yield from self._opt_catalog.extract_variables(new=new)
+
 
     def train(self, iterate_number=10000, chains=self.optimizers):
         with tf.sesson as sess:
@@ -225,18 +230,16 @@ class cogito(object):
             if self._path.exists():
                 self._saver.restore(sess, self._path)
 
-            map(lambda v:sess.run(tf.variables_initializer(v)), self._used_variables)
-            else:
-                self._network.init(sess)
-                map(lambda opt: opt.init(sess), self._opt_book.extract_from_name_list(chains))
+            for v in self._extract_variables(new=True):
+                sess.run(tf.variables_initializer(v))
 
             # train
             for i in range(iterate_number):
-                for opt in self._opt_book.extract_from_name_list(chains):
+                for opt in self._opt_catalog.extract_from_name_list(chains):
                     opt.train(sess)
-            
+
             # save
-            self._saver = tf.train.Saver()
+            self._saver = tf.train.Saver(list(self._extract_variables()))
             self._saver.save(sess, self._save_path)
 
 
@@ -247,11 +250,7 @@ class cogito(object):
 
     @property
     def optimizers(self):
-        return self._book.names
-
-    def set_variables(variable):
-        self._new_variables.append(variable)
-
+        return self._catalog.names
 
 ########## source
 class base_source(metaclass=ABCMeta):
