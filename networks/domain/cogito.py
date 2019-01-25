@@ -151,25 +151,23 @@ class network_catalog:
         for v in self._network.variables:
             self.set_variables(v)
 
-    def extract_variables(self):
+    def extract_variables(self, new=False):
+        if new and self._initialized:
+            self._initialized = True
+            yield from self._extract_variables(self)
+        if not new:
+            yield from self._extract_variables(self)
+
+    def _extract_variables(self):
         for v in self._network.variables:
             yield v
 
-    def reset_initialized_status(self):
-        self._initialized = True
-
-    @property
-    def initialized(self):
-        return self._initialized
-
-    def 
 
 
 class optimizer_catalog:
     def __init__(self):
         self._opt_list = []
         self._new_opt_list = []
-
 
     def register(self, optimizer, network):
         assert optimizer.name not in dir(self)
@@ -191,8 +189,23 @@ class optimizer_catalog:
         for optname in name_list:
             yield getattr(self, optname)
 
-    def reset_new_opt(self):
-        self._new_opt_list = []
+    def extract_variables(self, new=False):
+        if new:
+            yield from self._extract_new_variables()
+        else:
+            yield from self._extract_all_variables()
+
+    def _extract_new_variables(self):
+        while len(self._new_opt_list) != 0:
+            opt = self._new_opt_list.pop(0)
+            for v in opt.variables:
+                yield v
+
+    def _extract_all_variables(self):
+        for opt in self._opt_list:
+            for v in opt.variables:
+                yield v
+
 '''
 <https://stackoverflow.com/questions/43068472/how-to-save-a-specific-variable-in-tensorflow>
 '''
@@ -245,7 +258,6 @@ class cogito(object):
 
     def predict(self):
         pass
-
 
 
     @property
