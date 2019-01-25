@@ -28,10 +28,6 @@ class base_network(metaclass=ABCMeta):
     def variables(self):
         return self._variables
 
-    def init(self, sess):
-        for v in self._variables:
-            sess.run(tf.variables_initializer(v))
-
     @abstractmethod
     def placeholders(self): pass
 
@@ -74,10 +70,6 @@ class simple_network(base_network):
         self.Woi = tf.Variable([self._input_size, self._output_size], name='Woi')
         self.Woh = tf.Variable([self._hidden_size, self._output_size], name='Woh')
 
-    def save(self):
-        pass
-
-
 class base_optimizer(metaclass=ABCMeta):
     def __init__(self, name='base_optimizer'):
         self._name = name
@@ -101,13 +93,6 @@ class base_optimizer(metaclass=ABCMeta):
     @property
     def variables(self):
         return self._variables
-
-    def init(self, sess):
-        for v in self._variables:
-            sess.run(tf.variables_initializer(v))
-
-    def save(self, sess):
-        pass
 
 
 class simple_bp(base_optimizer):
