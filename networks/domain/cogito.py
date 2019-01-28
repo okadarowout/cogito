@@ -57,7 +57,7 @@ class simple_network(base_network):
     def placeholders(self):
         return [self.input, self.hidden, self.output]
 
-    def confiture(self):
+    def configure(self):
         self.input = tf.placeholder(tf.float32, [self._input_size], name='input')
         self.hidden = tf.placeholder(tf.float32, [self._hidden_size], name='hidden')
         self.output = tf.placeholder(tf.float32, [self._output_size], name='output')
@@ -118,7 +118,7 @@ class simple_bp(base_optimizer):
         sess.run(self._opt.minimize(self._loss),
             feed_dict={self._input: input_data, self._output: output_data})
 
-    def predict(self. sess, test_source=False):
+    def predict(self, sess, test_source=False):
         if test_source and self._source.train:
             self._source.reset_source(train=False)
         input_data, output_data = self._source.__next__()
@@ -127,14 +127,14 @@ class simple_bp(base_optimizer):
 class network_catalog:
     def __init__(self):
         self._network = None
-        self._initialized = False
+        self._initialized = True
 
     def register(self, network):
-        self._network = network()
-        self._network.confiture()
+        self._network = network
+        self._network.configure()
         self._initialized = False
-        for v in self._network.variables:
-            self.set_variables(v)
+#        for v in self._network.variables:
+#            self.set_variables(v)
 
     def extract_variables(self, new=False):
         if new and self._initialized:
@@ -217,12 +217,16 @@ class cogito(object):
                     format(type(optimizer).__name__))
         self._opt_catalog.register(optimizer(source()), self.network)
 
-    def _extract_variables(new=False):
+    def _extract_variables(self, new=False):
         yield from self._net_catalog.extract_variables(new=new)
         yield from self._opt_catalog.extract_variables(new=new)
 
 
-    def train(self, iterate_number=10000, chains=self.optimizers):
+    def train(self, iterate_number=10000, chains=[]):
+
+        if len(chains) == 0:
+            chains = self.optimizers
+
         with tf.sesson as sess:
             # initialize
             if self._path.exists():
@@ -304,7 +308,7 @@ class mnist(base_source):
             shape = (reduce(mul, shape))
         return shape
 
-def test
+def test(): pass
 
 def main():
     network_size = {'input_size': 28 * 28, 
@@ -312,7 +316,7 @@ def main():
                  'output_size': 10}
     cgt = cogito()
     cgt.set_networks(simple_network(**network_size))
-    cgt.set_optimizer(simple_bp(mnist(melt=True)))
+    cgt.set_optimizer(simple_bp, mnist(melt=True))
     cgt.set_optimizer(simple_ae(mnist(melt=True)))
     cgt.train(iterate_number=10, chains=cgt.optimizers)
     cgt.predict(iterate_number=chains, chains=cgt.predictable)
