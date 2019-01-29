@@ -94,6 +94,17 @@ class base_optimizer(metaclass=ABCMeta):
     def variables(self):
         return self._variables
 
+        @classmethod
+        def __subclasshook__(Class, Subclass):
+            if Class is Renderer:
+                attributes = collections.ChainMap(*(Superclass.__dict__
+                        for Superclass in Subclass.__mro__))
+                methods = ("header", "paragraph", "footer")
+                if all(method in attributes for method in methods):
+                    return True
+            return NotImplemented
+
+
 
 class simple_bp(base_optimizer):
     """docstring for simple_optimizer"""
@@ -126,12 +137,12 @@ class simple_bp(base_optimizer):
 
 class network_catalog:
     def __init__(self):
-        self._network = None
+        self.network = None
         self._initialized = True
 
     def register(self, network):
-        self._network = network
-        self._network.configure()
+        self.network = network
+        self.network.configure()
         self._initialized = False
 #        for v in self._network.variables:
 #            self.set_variables(v)
@@ -144,7 +155,7 @@ class network_catalog:
             yield from self._extract_variables(self)
 
     def _extract_variables(self):
-        for v in self._network.variables:
+        for v in self.network.variables:
             yield v
 
 
@@ -212,10 +223,10 @@ class cogito(object):
         self._net_catalog.register(network)
 
     def set_optimizer(self, optimizer, source):
-        if not isinstance(optimizer, base_optimizer):
+        if not issubclass(optimizer, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
-                    format(type(optimizer).__name__))
-        self._opt_catalog.register(optimizer(source()), self.network)
+                            format(type(optimizer).__name__))
+        self._opt_catalog.register(optimizer(source), self._net_catalog.network)
 
     def _extract_variables(self, new=False):
         yield from self._net_catalog.extract_variables(new=new)
