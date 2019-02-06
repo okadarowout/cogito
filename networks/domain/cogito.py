@@ -62,13 +62,22 @@ class simple_network(base_network):
         self.hidden = tf.placeholder(tf.float32, [self._hidden_size], name='hidden')
         self.output = tf.placeholder(tf.float32, [self._output_size], name='output')
 
-        self.Wih = tf.Variable([self._hidden_size, self._input_size], name='Wih')
-        self.Wio = tf.Variable([self._output_size, self._input_size], name='Wio')
-        self.Whi = tf.Variable([self._input_size, self._hidden_size], name='Whi')
-        self.Whh = tf.Variable([self._hidden_size, self._hidden_size], name='Whh')
-        self.Who = tf.Variable([self._output_size, self._hidden_size], name='Who')
-        self.Woi = tf.Variable([self._input_size, self._output_size], name='Woi')
-        self.Woh = tf.Variable([self._hidden_size, self._output_size], name='Woh')
+#        self.Wih = tf.Variable([self._hidden_size, self._input_size], name='Wih')
+#        self.Wio = tf.Variable([self._output_size, self._input_size], name='Wio')
+#        self.Whi = tf.Variable([self._input_size, self._hidden_size], name='Whi')
+#        self.Whh = tf.Variable([self._hidden_size, self._hidden_size], name='Whh')
+#        self.Who = tf.Variable([self._output_size, self._hidden_size], name='Who')
+#        self.Woi = tf.Variable([self._input_size, self._output_size], name='Woi')
+#        self.Woh = tf.Variable([self._hidden_size, self._output_size], name='Woh')
+
+        self.Wih = tf.get_variable('Wih', [self._hidden_size, self._input_size])
+        self.Wio = tf.get_variable('Wio', [self._output_size, self._input_size])
+        self.Whi = tf.get_variable('Whi', [self._input_size, self._hidden_size])
+        self.Whh = tf.get_variable('Whh', [self._hidden_size, self._hidden_size])
+        self.Who = tf.get_variable('Who', [self._output_size, self._hidden_size])
+        self.Woi = tf.get_variable('Woi', [self._input_size, self._output_size])
+        self.Woh = tf.get_variable('Woh', [self._hidden_size, self._output_size])
+        print(self.Wih.shape)
 
 class base_optimizer(metaclass=ABCMeta):
     def __init__(self, name='base_optimizer'):
@@ -94,15 +103,15 @@ class base_optimizer(metaclass=ABCMeta):
     def variables(self):
         return self._variables
 
-        @classmethod
-        def __subclasshook__(Class, Subclass):
-            if Class is Renderer:
-                attributes = collections.ChainMap(*(Superclass.__dict__
-                        for Superclass in Subclass.__mro__))
-                methods = ("header", "paragraph", "footer")
-                if all(method in attributes for method in methods):
-                    return True
-            return NotImplemented
+#    @classmethod
+#    def __subclasshook__(Class, Subclass):
+#        if Class is Renderer:
+#            attributes = collections.ChainMap(*(Superclass.__dict__
+#                    for Superclass in Subclass.__mro__))
+#            methods = ("header", "paragraph", "footer")
+#            if all(method in attributes for method in methods):
+#                return True
+#        return NotImplemented
 
 
 
@@ -114,10 +123,13 @@ class simple_bp(base_optimizer):
         self._variables = []
 
     def configure(self, network):
-        raise self._source.shape == network.input_size
+        assert self._source.shape == network.input_size
         self._input = network.input
         self._output = network.output
-        X0 = tf.matmul(self._input, network.Wih)
+        print(self._input.shape)
+        print(network.Wih.shape)
+#        X0 = tf.matmul(self._input, network.Wih)
+        X0 = tf.matmul(network.Wih, self._input)       
         X1 = tf.tanh(tf.nn.batch_normalization(X0))
         self.output = tf.nn.softmax(tf.matmul(X1, network.Who))
         self._loss = tf.losses.softmax_cross_entropy(self._output, self.output)
@@ -142,7 +154,7 @@ class network_catalog:
 
     def register(self, network):
         self.network = network
-        self.network.configure()
+#        self.network.configure()
         self._initialized = False
 #        for v in self._network.variables:
 #            self.set_variables(v)
@@ -223,10 +235,11 @@ class cogito(object):
         self._net_catalog.register(network)
 
     def set_optimizer(self, optimizer, source):
-        if not issubclass(optimizer, base_optimizer):
+        opt = optimizer(source)
+        if not isinstance(opt, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
                             format(type(optimizer).__name__))
-        self._opt_catalog.register(optimizer(source), self._net_catalog.network)
+        self._opt_catalog.register(opt, self._net_catalog.network)
 
     def _extract_variables(self, new=False):
         yield from self._net_catalog.extract_variables(new=new)
