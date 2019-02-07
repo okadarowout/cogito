@@ -129,9 +129,11 @@ class simple_bp(base_optimizer):
         print(self._input.shape)
         print(network.Wih.shape)
 #        X0 = tf.matmul(self._input, network.Wih)
-        X0 = tf.matmul(network.Wih, self._input)       
-        X1 = tf.tanh(tf.nn.batch_normalization(X0))
-        self.output = tf.nn.softmax(tf.matmul(X1, network.Who))
+        X0 = tf.matmul(network.Wih, tf.reshape(self._input, [-1, 1]))       
+        X1 = tf.tanh(tf.nn.batch_normalization(X0, 0, 1, 0, 1, 1e-8))
+        print(X1.shape)
+        print(network.Who.shape)
+        self.output = tf.reshape(tf.nn.softmax(tf.matmul(network.Who, X1)), self._output.shape)
         self._loss = tf.losses.softmax_cross_entropy(self._output, self.output)
         self._opt = tf.train.AdamOptimizer()
         self._variables = self._variables + self._opt.variables()
@@ -275,7 +277,7 @@ class cogito(object):
 
     @property
     def optimizers(self):
-        return self._catalog.names
+        return self._net_catalog.names
 
 ########## source
 class base_source(metaclass=ABCMeta):
@@ -332,12 +334,22 @@ class mnist(base_source):
             shape = (reduce(mul, shape))
         return shape
 
-def test(): pass
-
-def main():
+def test():
+    tf.reset_default_graph()
     network_size = {'input_size': 28 * 28, 
                  'hidden_size': 1000,
                  'output_size': 10}
+    cgt = cogito()
+    cgt.set_networks(simple_network(**network_size))
+    cgt.set_optimizer(simple_bp, mnist(melt=True))
+#    cgt.set_optimizer(simple_ae(mnist(melt=True)))
+    cgt.train(iterate_number=10, chains=cgt.optimizers)
+#    cgt.predict(iterate_number=chains, chains=cgt.predictable)
+
+def main():
+    network_size = {'input_size': 28 * 28, 
+                    'hidden_size': 1000,
+                    'output_size': 10}
     cgt = cogito()
     cgt.set_networks(simple_network(**network_size))
     cgt.set_optimizer(simple_bp, mnist(melt=True))
