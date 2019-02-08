@@ -181,10 +181,10 @@ class optimizer_catalog:
 
     def register(self, optimizer, network):
         assert optimizer.name not in dir(self)
-        opt = optimizer.configure(network)
-        self._new_opt_list.append(opt)
-        self._opt_list.append(opt)
-        setattr(self, optimizer.name, opt)
+        optimizer.configure(network)
+        self._new_opt_list.append(optimizer)
+        self._opt_list.append(optimizer)
+        setattr(self, optimizer.name, optimizer)
 
     @property
     def names(self):
@@ -241,6 +241,7 @@ class cogito(object):
         if not isinstance(opt, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
                             format(type(optimizer).__name__))
+        print(opt)
         self._opt_catalog.register(opt, self._net_catalog.network)
 
     def _extract_variables(self, new=False):
@@ -253,7 +254,7 @@ class cogito(object):
         if len(chains) == 0:
             chains = self.optimizers
 
-        with tf.sesson as sess:
+        with tf.Session() as sess:
             # initialize
             if self._path.exists():
                 self._saver.restore(sess, self._path)
@@ -277,7 +278,7 @@ class cogito(object):
 
     @property
     def optimizers(self):
-        return self._net_catalog.names
+        return self._opt_catalog.names
 
 ########## source
 class base_source(metaclass=ABCMeta):
