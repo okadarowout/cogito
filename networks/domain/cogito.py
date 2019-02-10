@@ -1,5 +1,6 @@
 import pathlib
 import collections
+import numpy as np
 import tensorflow as tf
 from operator import mul
 from functools import reduce
@@ -140,6 +141,10 @@ class simple_bp(base_optimizer):
 
     def train(self, sess):
         input_data, output_data = self._source.__next__()
+        print(input_data.shape)
+        print(self._input.shape)
+        print(output_data.shape)
+        print(self._output.shape)
         sess.run(self._opt.minimize(self._loss),
             feed_dict={self._input: input_data, self._output: output_data})
 
@@ -256,8 +261,8 @@ class cogito(object):
 
         with tf.Session() as sess:
             # initialize
-            if self._path.exists():
-                self._saver.restore(sess, self._path)
+            if self._save_path.exists():
+                self._saver.restore(sess, self._save_path)
 
             for v in self._extract_variables(new=True):
                 sess.run(tf.variables_initializer(v))
@@ -295,9 +300,10 @@ class base_source(metaclass=ABCMeta):
 
 
 class mnist(base_source):
-    def __init__(self, train=True, melt=False):
+    def __init__(self, train=True, melt=False, dummy=True):
         self._train = train
         self._melt = melt
+        self._dummy = dummy
 
         krs_mnist = tf.keras.datasets.mnist
         (x_train, y_train), (x_test, y_test) = krs_mnist.load_data()
@@ -313,6 +319,14 @@ class mnist(base_source):
         y = self._y_train[self._cnt]
         if self._melt:
             x = x.reshape(self.shape)
+        if self._dummy:
+            print(y)
+            print(type(y))
+            assert type(y) == int
+            assert y >= 0
+            assert y <= 9
+            y = np.array([0] * y + [1] + [0] * (9 - y))
+        
         self._update_cnt()
         return x, y
 
@@ -336,6 +350,8 @@ class mnist(base_source):
         return shape
 
 def test():
+    source = mnist()
+    print(next(source))
     tf.reset_default_graph()
     network_size = {'input_size': 28 * 28, 
                  'hidden_size': 1000,
