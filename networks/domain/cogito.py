@@ -320,9 +320,7 @@ class mnist(base_source):
         if self._melt:
             x = x.reshape(self.shape)
         if self._dummy:
-            print(y)
-            print(type(y))
-            assert type(y) == int
+            assert isinstance(y, (int, np.integer))
             assert y >= 0
             assert y <= 9
             y = np.array([0] * y + [1] + [0] * (9 - y))
@@ -350,8 +348,10 @@ class mnist(base_source):
         return shape
 
 def test():
-    source = mnist()
-    print(next(source))
+    ## source
+    source = mnist(melt=True, dummy=False)
+    x, y = next(source)
+    isinstance(y, np.uint8)
     tf.reset_default_graph()
     network_size = {'input_size': 28 * 28, 
                  'hidden_size': 1000,
