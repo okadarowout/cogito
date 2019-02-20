@@ -95,7 +95,6 @@ class base_optimizer(metaclass=ABCMeta):
     @abstractmethod
     def predict(self): pass
 
-
     @property
     def name(self):
         return self._name
@@ -130,22 +129,19 @@ class simple_bp(base_optimizer):
         print(self._input.shape)
         print(network.Wih.shape)
 #        X0 = tf.matmul(self._input, network.Wih)
-        X0 = tf.matmul(network.Wih, tf.reshape(self._input, [-1, 1]))       
+        X0 = tf.matmul(network.Wih, tf.reshape(self._input, [-1, 1]))
         X1 = tf.tanh(tf.nn.batch_normalization(X0, 0, 1, 0, 1, 1e-8))
         print(X1.shape)
         print(network.Who.shape)
         self.output = tf.reshape(tf.nn.softmax(tf.matmul(network.Who, X1)), self._output.shape)
         self._loss = tf.losses.softmax_cross_entropy(self._output, self.output)
         self._opt = tf.train.AdamOptimizer()
+        self._objective_function = self._opt.minimize(self._loss)
         self._variables = self._variables + self._opt.variables()
 
     def train(self, sess):
         input_data, output_data = self._source.__next__()
-        print(input_data.shape)
-        print(self._input.shape)
-        print(output_data.shape)
-        print(self._output.shape)
-        sess.run(self._opt.minimize(self._loss),
+        sess.run(self._objective_function,
             feed_dict={self._input: input_data, self._output: output_data})
 
     def predict(self, sess, test_source=False):
@@ -167,17 +163,17 @@ class network_catalog:
 #            self.set_variables(v)
 
     def extract_variables(self, new=False):
-        if new and self._initialized:
+        if new and (not self._initialized):
             self._initialized = True
-            yield from self._extract_variables(self)
+            yield from self._extract_variables()
+        if new and self._initialized:
+            raise StopIteration
         if not new:
-            yield from self._extract_variables(self)
+            yield from self._extract_variables()
 
     def _extract_variables(self):
         for v in self.network.variables:
             yield v
-
-
 
 class optimizer_catalog:
     def __init__(self):
@@ -211,6 +207,9 @@ class optimizer_catalog:
             yield from self._extract_all_variables()
 
     def _extract_new_variables(self):
+        print('in optimizer_catalog._extract_new_variables(self)')
+        print('check optimizer_catalog._new_opt_list')
+        print(self._new_opt_list)
         while len(self._new_opt_list) != 0:
             opt = self._new_opt_list.pop(0)
             for v in opt.variables:
@@ -264,8 +263,9 @@ class cogito(object):
             if self._save_path.exists():
                 self._saver.restore(sess, self._save_path)
 
-            for v in self._extract_variables(new=True):
-                sess.run(tf.variables_initializer(v))
+            sess.run(tf.variables_initializer(self._extract_variables(new=True)))
+            # for v in self._extract_variables(new=True):
+            #     sess.run(tf.variables_initializer(v))
 
             # train
             for i in range(iterate_number):
@@ -274,7 +274,8 @@ class cogito(object):
 
             # save
             self._saver = tf.train.Saver(list(self._extract_variables()))
-            self._saver.save(sess, self._save_path)
+            # self._saver.save(sess, self._save_path)
+            self._saver.save(sess, str(self._save_path))
 
 
     def predict(self):
@@ -324,7 +325,7 @@ class mnist(base_source):
             assert y >= 0
             assert y <= 9
             y = np.array([0] * y + [1] + [0] * (9 - y))
-        
+
         self._update_cnt()
         return x, y
 
@@ -353,18 +354,20 @@ def test():
     x, y = next(source)
     isinstance(y, np.uint8)
     tf.reset_default_graph()
-    network_size = {'input_size': 28 * 28, 
+    network_size = {'input_size': 28 * 28,
                  'hidden_size': 1000,
                  'output_size': 10}
     cgt = cogito()
     cgt.set_networks(simple_network(**network_size))
     cgt.set_optimizer(simple_bp, mnist(melt=True))
 #    cgt.set_optimizer(simple_ae(mnist(melt=True)))
+    cgt._opt_catalog.
     cgt.train(iterate_number=10, chains=cgt.optimizers)
+    cgt._opt_catalog._opt_list[0]._variables
 #    cgt.predict(iterate_number=chains, chains=cgt.predictable)
 
 def main():
-    network_size = {'input_size': 28 * 28, 
+    network_size = {'input_size': 28 * 28,
                     'hidden_size': 1000,
                     'output_size': 10}
     cgt = cogito()
