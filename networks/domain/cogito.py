@@ -6,16 +6,12 @@ from operator import mul
 from functools import reduce
 from abc import abstractmethod, ABCMeta
 
-
-
-
-
-
 class base_network(metaclass=ABCMeta):
     def __init__(self):
         self._input_size = None
         self._output_size = None
         self._variables = []
+        self._verbose = 0
 
     @property
     def input_size(self):
@@ -33,7 +29,7 @@ class base_network(metaclass=ABCMeta):
     def placeholders(self): pass
 
     @abstractmethod
-    def configure(self): pass
+    def configure(self, verbose=0): pass
 
 
 
@@ -46,7 +42,7 @@ class simple_network(base_network):
         self._input_size = input_size
         self._hidden_size = hidden_size
         self._output_size = output_size
-        self.configure()
+        self._verbose = 0
 
     @property
     def _variables(self):
@@ -58,7 +54,8 @@ class simple_network(base_network):
     def placeholders(self):
         return [self.input, self.hidden, self.output]
 
-    def configure(self):
+    def configure(self, verbose=0):
+        self._verbose = verbose
         self.input = tf.placeholder(tf.float32, [self._input_size], name='input')
         self.hidden = tf.placeholder(tf.float32, [self._hidden_size], name='hidden')
         self.output = tf.placeholder(tf.float32, [self._output_size], name='output')
@@ -81,10 +78,11 @@ class simple_network(base_network):
         print(self.Wih.shape)
 
 class base_optimizer(metaclass=ABCMeta):
-    def __init__(self, name='base_optimizer'):
+    def __init__(self, name='base_optimizer', verbose=0):
         self._name = name
         self.predictable = False
         self._variables = []
+        self._verbose = verbose
 
     @abstractmethod
     def configure(self, network): pass
@@ -121,8 +119,10 @@ class simple_bp(base_optimizer):
         self._source = source
         self._name = name
         self._variables = []
+        self._verbose = 0
 
-    def configure(self, network):
+    def configure(self, network, verbose=0):
+        self._verbose = verbose
         assert self._source.shape == network.input_size
         self._input = network.input
         self._output = network.output
@@ -151,12 +151,14 @@ class simple_bp(base_optimizer):
         sess.run(self.output, feed_dict={self._input: input_data})
 
 class network_catalog:
-    def __init__(self):
+    def __init__(self, verbose=0):
         self.network = None
         self._initialized = True
+        self._verbose = verbose
 
     def register(self, network):
         self.network = network
+        self.network.configure(self._verbose)
 #        self.network.configure()
         self._initialized = False
 #        for v in self._network.variables:
@@ -176,13 +178,14 @@ class network_catalog:
             yield v
 
 class optimizer_catalog:
-    def __init__(self):
+    def __init__(self, verbose=0):
         self._opt_list = []
         self._new_opt_list = []
+        self._verbose = verbose
 
     def register(self, optimizer, network):
         assert optimizer.name not in dir(self)
-        optimizer.configure(network)
+        optimizer.configure(network, self._verbose)
         self._new_opt_list.append(optimizer)
         self._opt_list.append(optimizer)
         setattr(self, optimizer.name, optimizer)
@@ -228,14 +231,15 @@ class cogito(object):
     cogito is multi task training object
     cogito has one network and one or more optimizer
     """
-    def __init__(self, save_path=None, save_name='cgt.ckpk'):
+    def __init__(self, save_path=None, save_name='cgt.ckpk', verbose=0):
         if save_path is None:
             self._save_path = pathlib.Path.cwd() / save_name
         else:
             self._save_path = pathlib.Path(save_path) / save_name
-        self._opt_catalog = optimizer_catalog()
-        self._net_catalog = network_catalog()
+        self._opt_catalog = optimizer_catalog(verbose=verbose)
+        self._net_catalog = network_catalog(verbose=verbose)
         self._saver = None
+        self._verbose = verbose
 
     def set_networks(self, network):
         self._net_catalog.register(network)
