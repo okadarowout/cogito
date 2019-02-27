@@ -75,12 +75,10 @@ class simple_network(base_network):
         self.Who = tf.get_variable('Who', [self._output_size, self._hidden_size])
         self.Woi = tf.get_variable('Woi', [self._input_size, self._output_size])
         self.Woh = tf.get_variable('Woh', [self._hidden_size, self._output_size])
-        print(self.Wih.shape)
 
 class base_optimizer(metaclass=ABCMeta):
     def __init__(self, name='base_optimizer', verbose=0):
         self._name = name
-        self.predictable = False
         self._variables = []
         self._verbose = verbose
 
@@ -126,13 +124,16 @@ class simple_bp(base_optimizer):
         assert self._source.shape == network.input_size
         self._input = network.input
         self._output = network.output
-        print(self._input.shape)
-        print(network.Wih.shape)
-#        X0 = tf.matmul(self._input, network.Wih)
+        if self._verbose >= 1:
+            print('matmul check for X0')
+            print('former shape: {shape}'.format(shape=self._input.shape))
+            print('latter shape: {shape}'.format(shape=network.Wih.shape))
         X0 = tf.matmul(network.Wih, tf.reshape(self._input, [-1, 1]))
         X1 = tf.tanh(tf.nn.batch_normalization(X0, 0, 1, 0, 1, 1e-8))
-        print(X1.shape)
-        print(network.Who.shape)
+        if self._verbose >= 1:
+            print('matmul check for self.output')
+            print('former shape: {shape}'.format(shape=network.Who.shape))
+            print('latter shape: {shape}'.format(shape=X1.shape))
         self.output = tf.reshape(tf.nn.softmax(tf.matmul(network.Who, X1)), self._output.shape)
         self._loss = tf.losses.softmax_cross_entropy(self._output, self.output)
         self._opt = tf.train.AdamOptimizer()
@@ -143,6 +144,10 @@ class simple_bp(base_optimizer):
         input_data, output_data = self._source.__next__()
         sess.run(self._objective_function,
             feed_dict={self._input: input_data, self._output: output_data})
+        if self._verbose >= 1:
+            loss = sess.run(self._loss,
+                feed_dict={self._input: input_data, self._output: output_data})
+            print('{name} loss: {loss}'.format(name=self._name, loss=loss))
 
     def predict(self, sess, test_source=False):
         if test_source and self._source.train:
@@ -168,8 +173,8 @@ class network_catalog:
         if new and (not self._initialized):
             self._initialized = True
             yield from self._extract_variables()
-        if new and self._initialized:
-            raise StopIteration
+        # if new and self._initialized:
+        #     yield StopIteration
         if not new:
             yield from self._extract_variables()
 
@@ -196,7 +201,7 @@ class optimizer_catalog:
 
     @property
     def predictable(self):
-        predictable_iter = filter(lambda obj: obj.predictable, self._optself._opt_list)
+        predictable_iter = filter(lambda obj: hasattr(obj, 'predict'), self._optself._opt_list)
         return list(map(lambda obj:obj._name, predictable_iter))
 
     def extract_from_name_list(self, name_list):
@@ -210,9 +215,10 @@ class optimizer_catalog:
             yield from self._extract_all_variables()
 
     def _extract_new_variables(self):
-        print('in optimizer_catalog._extract_new_variables(self)')
-        print('check optimizer_catalog._new_opt_list')
-        print(self._new_opt_list)
+        if self._verbose >= 1:
+            print('in optimizer_catalog._extract_new_variables(self)')
+            print('check optimizer_catalog._new_opt_list')
+            print(self._new_opt_list)
         while len(self._new_opt_list) != 0:
             opt = self._new_opt_list.pop(0)
             for v in opt.variables:
@@ -249,7 +255,6 @@ class cogito(object):
         if not isinstance(opt, base_optimizer):
             raise TypeError("Expected object of type base_optimizer, got {}".
                             format(type(optimizer).__name__))
-        print(opt)
         self._opt_catalog.register(opt, self._net_catalog.network)
 
     def _extract_variables(self, new=False):
@@ -273,6 +278,8 @@ class cogito(object):
 
             # train
             for i in range(iterate_number):
+                if self._verbose >= 3:
+                    print(i)
                 for opt in self._opt_catalog.extract_from_name_list(chains):
                     opt.train(sess)
 
@@ -282,8 +289,27 @@ class cogito(object):
             self._saver.save(sess, str(self._save_path))
 
 
-    def predict(self):
-        pass
+    def predict(self, iterate_number=10000, chains=[]):
+        with tf.Session() as sess:
+            # initialize
+            if self._save_path.exists():
+                self._saver.restore(sess, self._save_path)
+
+            sess.run(tf.variables_initializer(self._extract_variables(new=True)))
+            # for v in self._extract_variables(new=True):
+            #     sess.run(tf.variables_initializer(v))
+
+            # train
+            for i in range(iterate_number):
+                if self._verbose >= 3:
+                    print(i)
+                for opt in self._opt_catalog.extract_from_name_list(chains):
+                    opt.train(sess)
+
+            # save
+            self._saver = tf.train.Saver(list(self._extract_variables()))
+            # self._saver.save(sess, self._save_path)
+            self._saver.save(sess, str(self._save_path))
 
 
     @property
@@ -311,11 +337,9 @@ class mnist(base_source):
         self._dummy = dummy
 
         krs_mnist = tf.keras.datasets.mnist
-        (x_train, y_train), (x_test, y_test) = krs_mnist.load_data()
-        self._x_train = x_train
-        self._y_train = y_train
-        self._x_test = x_test
-        self._y_test = y_test
+        xy_train, xy_test = krs_mnist.load_data()
+        self._x_train, self._y_train = xy_train
+        self._x_test, self._y_test = xy_test
 
         self.reset_source()
 
@@ -361,14 +385,19 @@ def test():
     network_size = {'input_size': 28 * 28,
                  'hidden_size': 1000,
                  'output_size': 10}
-    cgt = cogito()
+    cgt = cogito(verbose=3)
     cgt.set_networks(simple_network(**network_size))
     cgt.set_optimizer(simple_bp, mnist(melt=True))
 #    cgt.set_optimizer(simple_ae(mnist(melt=True)))
-    cgt._opt_catalog.
-    cgt.train(iterate_number=10, chains=cgt.optimizers)
-    cgt._opt_catalog._opt_list[0]._variables
-#    cgt.predict(iterate_number=chains, chains=cgt.predictable)
+    print(cgt.optimizers)
+    # print(list(cgt._extract_variables()))
+    for v in cgt._extract_variables():
+        print(v.name)
+    cgt.train(iterate_number=100, chains=cgt.optimizers)
+    cgt.train(iterate_number=100, chains=cgt.optimizers)
+
+    print(cgt.predict('simple_bp'))
+
 
 def main():
     network_size = {'input_size': 28 * 28,
