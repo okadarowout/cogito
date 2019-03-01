@@ -237,15 +237,21 @@ class cogito(object):
     cogito is multi task training object
     cogito has one network and one or more optimizer
     """
-    def __init__(self, save_path=None, save_name='cgt.ckpk', verbose=0):
+    def __init__(self, save_path=None, save_name='cgt.ckpk', initialize=False, verbose=0):
+        self._save_name = save_name
+        self._verbose = verbose
+
+        self._saver = None
         if save_path is None:
-            self._save_path = pathlib.Path.cwd() / save_name
+            self._save_path = pathlib.Path.cwd()
         else:
-            self._save_path = pathlib.Path(save_path) / save_name
+            self._save_path = pathlib.Path(save_path)
+        if initialize:
+            for trg in self._save_path.glob(self._save_name + '*'):
+                trg.unlink()
+
         self._opt_catalog = optimizer_catalog(verbose=verbose)
         self._net_catalog = network_catalog(verbose=verbose)
-        self._saver = None
-        self._verbose = verbose
 
     def set_networks(self, network):
         self._net_catalog.register(network)
@@ -385,7 +391,7 @@ def test():
     network_size = {'input_size': 28 * 28,
                  'hidden_size': 1000,
                  'output_size': 10}
-    cgt = cogito(verbose=3)
+    cgt = cogito(verbose=3, initialize=True)
     cgt.set_networks(simple_network(**network_size))
     cgt.set_optimizer(simple_bp, mnist(melt=True))
 #    cgt.set_optimizer(simple_ae(mnist(melt=True)))
