@@ -275,7 +275,7 @@ class cogito(object):
 
         with tf.Session() as sess:
             # initialize
-            if self._save_path.exists():
+            if (self._save_path / self._save_name).exists():
                 self._saver.restore(sess, self._save_path)
 
             sess.run(tf.variables_initializer(self._extract_variables(new=True)))
@@ -391,7 +391,7 @@ def test():
     network_size = {'input_size': 28 * 28,
                  'hidden_size': 1000,
                  'output_size': 10}
-    cgt = cogito(verbose=3, initialize=True)
+    cgt = cogito(verbose=1, initialize=True)
     cgt.set_networks(simple_network(**network_size))
     cgt.set_optimizer(simple_bp, mnist(melt=True))
 #    cgt.set_optimizer(simple_ae(mnist(melt=True)))
